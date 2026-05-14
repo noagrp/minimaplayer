@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minima Player</title>
+    <style>
+        :root { --border: #1a1a1a; --white: #ffffff; --dim: #333; --accent: #0078d7; }
+        body {
+            margin: 0; height: 100vh; background: #000;
+            overflow: hidden; font-family: 'Inter', sans-serif;
+            display: flex; justify-content: center; color: var(--white);
+        }
+
+        #stage {
+            width: 100%; max-width: 500px; height: 100%; position: relative;
+            background: #000; display: flex; flex-direction: column;
+            border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+        }
+
+        .particle {
+            position: absolute; 
+            width: 20px; height: 2px;
+            pointer-events: none;
+            z-index: 5; 
+            transition: all 2.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            background: currentColor;
+            box-shadow: 0 0 10px currentColor;
+            opacity: 0.3;
+        }
+
+        @keyframes digitalBreath {
+            0%, 100% { filter: brightness(1); opacity: 0.2; }
+            50% { filter: brightness(2); opacity: 0.6; }
+        }
+        .looping { animation: digitalBreath 3s infinite ease-in-out; }
+
+        #player-ui {
+            padding: 40px 30px; background: #000;
+            border-top: 1px solid var(--border); z-index: 1000;
+        }
+        #track-info {
+            font-size: 10px; letter-spacing: 7px; text-transform: uppercase;
+            margin-bottom: 35px; text-align: center; color: var(--dim);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .controls { display: flex; justify-content: space-between; align-items: center; }
+        .control-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--dim); font-size: 16px; transition: 0.4s;
+        }
+        .control-btn.active { color: var(--white); text-shadow: 0 0 10px #fff; }
+        .play-trigger { font-size: 30px; color: var(--white); }
+
+        #fx-label {
+            font-size: 8px; letter-spacing: 4px; color: var(--dim);
+            text-align: center; margin-bottom: 15px; cursor: pointer;
+        }
+
+        #drawer {
+            position: absolute; top: 0; width: 100%; height: 80%;
+            background: #000; border-bottom: 1px solid var(--border);
+            transform: translateY(-100%); transition: 0.7s cubic-bezier(0.85, 0, 0.15, 1);
+            z-index: 2000; padding: 40px 30px; box-sizing: border-box;
+            display: flex; flex-direction: column;
+        }
+        #drawer.open { transform: translateY(0); }
+        #playlist-content { flex: 1; overflow-y: auto; }
+        .track-row {
+            padding: 20px 0; border-bottom: 1px solid #111;
+            font-size: 10px; letter-spacing: 2px; display: flex;
+            justify-content: space-between; cursor: pointer; color: var(--dim);
+        }
+        .track-row.playing { color: var(--white); }
+
+        .action-btn {
+            background: none; border: 1px solid var(--border);
+            color: var(--dim); font-size: 9px; padding: 14px;
+            cursor: pointer; letter-spacing: 3px; text-transform: uppercase;
+        }
+
+        #empty-state {
+            position: absolute; inset: 0; display: flex;
+            justify-content: center; align-items: center; z-index: 3000;
+            background: #000;
+        }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="stage">
+        <div id="empty-state">
+            <label class="action-btn" style="padding: 25px 60px;">
+                Initialize Library
+                <input type="file" id="file-init" accept="audio/*,video/mp4" multiple>
+            </label>
+        </div>
+
+        <div id="drawer">
+            <div style="font-size: 8px; letter-spacing: 5px; color: #222; margin-bottom: 20px;">CATALOG</div>
+            <div id="playlist-content"></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:20px;">
+                <label class="action-btn" style="text-align:center;">Add Tracks<input type="file" id="file-add" accept="audio/*,video/mp4" multiple></label>
+                <button class="action-btn" onclick="location.reload()">Reset</button>
+            </div>
+        </div>
+
+        <div style="flex: 1; position: relative; width: 100%;" id="visual-area"></div>
+
+        <div id="player-ui">
+            <div id="fx-label" onclick="cycleFX()">VISUAL: AMBIENT BARS</div>
+            <div id="track-info">Standby</div>
+            <div class="controls">
+                <button class="control-btn" onclick="toggleShuffle()" id="shuf-btn">⤮</button>
+                <button class="control-btn" onclick="prevTrack()">«</button>
+                <button class="control-btn play-trigger" id="play-btn" onclick="togglePlay()">▶</button>
+                <button class="control-btn" onclick="nextTrack()">»</button>
+                <button class="control-btn" id="rep-btn" onclick="cycleRepeat()">⟳</button>
+                <button class="control-btn" onclick="toggleList()">☰</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wmpPalette = ['#0078d7', '#ffffff', '#00f2ff', '#555555'];
+        let audio = null, playlist = [], trackIdx = 0;
+        let isPlaying = false, isShuffle = false, repeatMode = 0;
+        let particles = [], fxMode = 0; 
+        const fxNames = ["AMBIENT BARS", "RADIAL SYNC", "DATA STREAM", "SONIC SCOPE"];
+
+        function initCanvas() {
+            const area = document.getElementById('visual-area');
+            for (let i = 0; i < 45; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle looping';
+                p.style.color = wmpPalette[i % wmpPalette.length];
+                p.style.left = Math.random() * 90 + '%';
+                p.style.top = Math.random() * 90 + '%';
+                area.appendChild(p);
+                particles.push(p);
+            }
+            animateFX();
+        }
+
+        function cycleFX() {
+            fxMode = (fxMode + 1) % fxNames.length;
+            document.getElementById('fx-label').innerText = "VISUAL: " + fxNames[fxMode];
+        }
+
+        function animateFX() {
+            const time = Date.now() * 0.0005;
+            particles.forEach((p, i) => {
+                let x, y, op = 0.3, w = "20px", h = "2px", rad = "0px";
+
+                switch(fxMode) {
+                    case 0: // Ambient Bars
+                        x = 50 + Math.sin(time + i) * 35;
+                        y = 45 + Math.cos(time * 0.8 + i) * 35;
+                        p.style.transform = `rotate(${Math.sin(time + i) * 90}deg)`;
+                        break;
+                    case 1: // Radial Sync
+                        const angle = time + (i * (Math.PI * 2 / particles.length));
+                        x = 50 + Math.cos(angle) * 30;
+                        y = 45 + Math.sin(angle) * 30;
+                        w = "40px"; h = "1px";
+                        p.style.transform = `rotate(${angle}rad)`;
+                        op = 0.5;
+                        break;
+                    case 2: // Data Stream
+                        x = (i * 7) % 100;
+                        y = (time * 100 + i * 15) % 100;
+                        w = "1px"; h = "60px";
+                        op = 0.15;
+                        break;
+                    case 3: // Sonic Scope
+                        x = (time * 50 + i * 5) % 100;
+                        y = 45 + Math.sin(time * 5 + (i * 0.5)) * 20;
+                        w = "2px"; h = "25px";
+                        op = 0.4;
+                        p.style.transform = `rotate(0deg)`;
+                        break;
+                }
+                
+                p.style.left = x + '%';
+                p.style.top = y + '%';
+                p.style.width = w;
+                p.style.height = h;
+                p.style.borderRadius = rad;
+                p.style.opacity = op;
+            });
+            setTimeout(animateFX, 50);
+        }
+
+        function gravityWell(x, y) {
+            particles.forEach((p, i) => {
+                setTimeout(() => {
+                    p.style.left = (x + (Math.random() - 0.5) * 80) + 'px';
+                    p.style.top = (y + (Math.random() - 0.5) * 80) + 'px';
+                    p.style.opacity = "0.9";
+                    p.style.color = "#fff";
+                    setTimeout(() => { p.style.color = wmpPalette[i % wmpPalette.length]; }, 1200);
+                }, i * 6);
+            });
+        }
+
+        const handleFiles = (files) => {
+            const newSongs = Array.from(files).map(f => ({
+                name: f.name.replace(/\.[^/.]+$/, "").toUpperCase(),
+                url: URL.createObjectURL(f)
+            }));
+            playlist = [...playlist, ...newSongs];
+            document.getElementById('empty-state').style.display = 'none';
+            if (particles.length === 0) initCanvas();
+            if (!audio) loadTrack(0);
+            refreshUI();
+        };
+
+        document.getElementById('file-init').onchange = (e) => handleFiles(e.target.files);
+        document.getElementById('file-add').onchange = (e) => handleFiles(e.target.files);
+
+        function loadTrack(idx) {
+            if (playlist.length === 0) return;
+            if (audio) audio.pause();
+            trackIdx = idx;
+            audio = new Audio(playlist[trackIdx].url);
+            document.getElementById('track-info').innerText = playlist[trackIdx].name;
+            audio.onended = () => repeatMode === 2 ? loadTrack(trackIdx) : nextTrack();
+            if (isPlaying) audio.play();
+            refreshUI();
+        }
+
+        function togglePlay() {
+            if (!audio) return;
+            if (audio.paused) { audio.play(); isPlaying = true; document.getElementById('play-btn').innerText = '॥'; }
+            else { audio.pause(); isPlaying = false; document.getElementById('play-btn').innerText = '▶'; }
+        }
+
+        function nextTrack() {
+            if (playlist.length === 0) return;
+            if (isShuffle) trackIdx = Math.floor(Math.random() * playlist.length);
+            else trackIdx = (trackIdx + 1) % playlist.length;
+            loadTrack(trackIdx);
+        }
+
+        function prevTrack() {
+            if (playlist.length === 0) return;
+            trackIdx = (trackIdx - 1 + playlist.length) % playlist.length;
+            loadTrack(trackIdx);
+        }
+
+        function cycleRepeat() {
+            repeatMode = (repeatMode + 1) % 3;
+            const btn = document.getElementById('rep-btn');
+            btn.classList.remove('active');
+            if (repeatMode === 1) { btn.innerText = '⟳'; btn.classList.add('active'); }
+            else if (repeatMode === 2) { btn.innerText = '⟲'; btn.classList.add('active'); }
+            else { btn.innerText = '⟳'; }
+        }
+
+        function toggleShuffle() { isShuffle = !isShuffle; document.getElementById('shuf-btn').classList.toggle('active'); }
+        function toggleList() { document.getElementById('drawer').classList.toggle('open'); }
+
+        function refreshUI() {
+            const container = document.getElementById('playlist-content');
+            container.innerHTML = '';
+            playlist.forEach((t, i) => {
+                const row = document.createElement('div');
+                row.className = `track-row ${i === trackIdx ? 'playing' : ''}`;
+                row.innerHTML = `<span>${t.name}</span> <span>${i === trackIdx ? 'ACTIVE' : ''}</span>`;
+                row.onclick = () => { loadTrack(i); toggleList(); };
+                container.appendChild(row);
+            });
+        }
+
+        const vArea = document.getElementById('visual-area');
+        vArea.addEventListener('mousedown', (e) => {
+            const rect = vArea.getBoundingClientRect();
+            gravityWell(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        vArea.addEventListener('touchstart', (e) => {
+            const rect = vArea.getBoundingClientRect();
+            const touch = e.touches[0];
+            gravityWell(touch.clientX - rect.left, touch.clientY - rect.top);
+        }, {passive: true});
+    </script>
+</body>
+</html>
