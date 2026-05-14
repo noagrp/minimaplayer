@@ -7,13 +7,17 @@
     <style>
         :root { --border: #1a1a1a; --white: #ffffff; --dim: #333; --accent: #0078d7; }
         body {
-            margin: 0; height: 100vh; background: #000;
+            margin: 0; 
+            /* Fix: Use dvh for mobile address bar compatibility */
+            height: 100vh; height: 100dvh; 
+            background: #000;
             overflow: hidden; font-family: 'Inter', sans-serif;
             display: flex; justify-content: center; color: var(--white);
         }
 
         #stage {
-            width: 100%; max-width: 500px; height: 100%; position: relative;
+            width: 100%; max-width: 500px; 
+            height: 100%; position: relative;
             background: #000; display: flex; flex-direction: column;
             border-left: 1px solid var(--border); border-right: 1px solid var(--border);
         }
@@ -36,21 +40,23 @@
         .looping { animation: digitalBreath 3s infinite ease-in-out; }
 
         #player-ui {
-            padding: 40px 30px; background: #000;
+            padding: 30px 30px 40px 30px; /* Adjusted for thumb reach */
+            background: #000;
             border-top: 1px solid var(--border); z-index: 1000;
         }
         #track-info {
             font-size: 10px; letter-spacing: 7px; text-transform: uppercase;
-            margin-bottom: 35px; text-align: center; color: var(--dim);
+            margin-bottom: 30px; text-align: center; color: var(--dim);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .controls { display: flex; justify-content: space-between; align-items: center; }
         .control-btn {
             background: none; border: none; cursor: pointer;
-            color: var(--dim); font-size: 16px; transition: 0.4s;
+            color: var(--dim); font-size: 18px; transition: 0.4s;
+            padding: 10px; /* Larger hit area for mobile */
         }
         .control-btn.active { color: var(--white); text-shadow: 0 0 10px #fff; }
-        .play-trigger { font-size: 30px; color: var(--white); }
+        .play-trigger { font-size: 32px; color: var(--white); }
 
         #fx-label {
             font-size: 8px; letter-spacing: 4px; color: var(--dim);
@@ -152,42 +158,24 @@
             const time = Date.now() * 0.0005;
             particles.forEach((p, i) => {
                 let x, y, op = 0.3, w = "20px", h = "2px", rad = "0px";
-
                 switch(fxMode) {
-                    case 0: // Ambient Bars
-                        x = 50 + Math.sin(time + i) * 35;
-                        y = 45 + Math.cos(time * 0.8 + i) * 35;
+                    case 0: 
+                        x = 50 + Math.sin(time + i) * 35; y = 45 + Math.cos(time * 0.8 + i) * 35;
                         p.style.transform = `rotate(${Math.sin(time + i) * 90}deg)`;
                         break;
-                    case 1: // Radial Sync
+                    case 1: 
                         const angle = time + (i * (Math.PI * 2 / particles.length));
-                        x = 50 + Math.cos(angle) * 30;
-                        y = 45 + Math.sin(angle) * 30;
-                        w = "40px"; h = "1px";
-                        p.style.transform = `rotate(${angle}rad)`;
-                        op = 0.5;
-                        break;
-                    case 2: // Data Stream
-                        x = (i * 7) % 100;
-                        y = (time * 100 + i * 15) % 100;
-                        w = "1px"; h = "60px";
-                        op = 0.15;
-                        break;
-                    case 3: // Sonic Scope
-                        x = (time * 50 + i * 5) % 100;
-                        y = 45 + Math.sin(time * 5 + (i * 0.5)) * 20;
-                        w = "2px"; h = "25px";
-                        op = 0.4;
-                        p.style.transform = `rotate(0deg)`;
+                        x = 50 + Math.cos(angle) * 30; y = 45 + Math.sin(angle) * 30;
+                        w = "40px"; h = "1px"; p.style.transform = `rotate(${angle}rad)`;
+                        op = 0.5; break;
+                    case 2: x = (i * 7) % 100; y = (time * 100 + i * 15) % 100; w = "1px"; h = "60px"; op = 0.15; break;
+                    case 3: 
+                        x = (time * 50 + i * 5) % 100; y = 45 + Math.sin(time * 5 + (i * 0.5)) * 20;
+                        w = "2px"; h = "25px"; op = 0.4; p.style.transform = `rotate(0deg)`;
                         break;
                 }
-                
-                p.style.left = x + '%';
-                p.style.top = y + '%';
-                p.style.width = w;
-                p.style.height = h;
-                p.style.borderRadius = rad;
-                p.style.opacity = op;
+                p.style.left = x + '%'; p.style.top = y + '%'; p.style.width = w; p.style.height = h;
+                p.style.borderRadius = rad; p.style.opacity = op;
             });
             setTimeout(animateFX, 50);
         }
