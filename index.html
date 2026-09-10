@@ -186,7 +186,7 @@
 
         #volume-row {
             grid-template-columns: 42px 1fr 42px;
-            margin-bottom: 14px;
+            margin: 14px 0 4px;
         }
 
         .time-label,
@@ -323,7 +323,7 @@
             #visual-core { min-height: 170px; }
             #track-info { margin-bottom: 8px; }
             #progress-row { margin-bottom: 6px; }
-            #volume-row { margin-bottom: 7px; }
+            #volume-row { margin-top: 8px; }
         }
     </style>
 </head>
@@ -349,6 +349,13 @@
         <div id="drawer">
             <div style="font-size:11px; letter-spacing:5px; color:var(--dim); margin-bottom:20px;">CATALOG</div>
             <div id="playlist-content"></div>
+
+            <div id="volume-row">
+                <button id="mute-btn" type="button" aria-label="Mute">🔊</button>
+                <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
+                <span class="volume-label" id="volume-value">80%</span>
+            </div>
+
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:20px;">
                 <label class="action-btn" style="text-align:center;">Add Tracks<input type="file" id="file-add" accept="audio/*,video/mp4" multiple></label>
                 <button class="action-btn" id="reset-btn">Reset</button>
@@ -367,12 +374,6 @@
                 <span class="time-label" id="elapsed">0:00</span>
                 <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek track">
                 <span class="time-label" id="duration">0:00</span>
-            </div>
-
-            <div id="volume-row">
-                <button id="mute-btn" type="button" aria-label="Mute">🔊</button>
-                <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
-                <span class="volume-label" id="volume-value">80%</span>
             </div>
 
             <div class="controls">
