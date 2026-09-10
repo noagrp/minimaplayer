@@ -172,27 +172,55 @@
             text-shadow: 0 0 8px rgba(255,255,255,0.5);
         }
 
-        #progress-row {
+        #progress-row,
+        #volume-row {
             display: grid;
-            grid-template-columns: 42px 1fr 42px;
             align-items: center;
             gap: 8px;
-            margin-bottom: 15px;
         }
 
-        .time-label {
+        #progress-row {
+            grid-template-columns: 42px 1fr 42px;
+            margin-bottom: 12px;
+        }
+
+        #volume-row {
+            grid-template-columns: 42px 1fr 42px;
+            margin-bottom: 14px;
+        }
+
+        .time-label,
+        .volume-label {
             font-size: 9px;
             color: #666;
             letter-spacing: 1px;
             font-variant-numeric: tabular-nums;
         }
 
-        .time-label:last-child { text-align: right; }
+        .time-label:last-child,
+        .volume-label:last-child { text-align: right; }
 
-        #seek {
+        #seek,
+        #volume {
             width: 100%;
             accent-color: var(--accent);
             cursor: pointer;
+        }
+
+        #mute-btn {
+            background: none;
+            border: 0;
+            color: var(--dim);
+            padding: 0;
+            min-width: 42px;
+            min-height: 36px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #mute-btn.active {
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent);
         }
 
         .controls {
@@ -290,11 +318,12 @@
 
         input[type="file"] { display: none; }
 
-        @media (max-height: 620px) {
-            #player-ui { padding-top: 12px; padding-bottom: 15px; }
-            #visual-core { min-height: 180px; }
-            #track-info { margin-bottom: 10px; }
-            #progress-row { margin-bottom: 8px; }
+        @media (max-height: 660px) {
+            #player-ui { padding-top: 10px; padding-bottom: 12px; }
+            #visual-core { min-height: 170px; }
+            #track-info { margin-bottom: 8px; }
+            #progress-row { margin-bottom: 6px; }
+            #volume-row { margin-bottom: 7px; }
         }
     </style>
 </head>
@@ -340,6 +369,12 @@
                 <span class="time-label" id="duration">0:00</span>
             </div>
 
+            <div id="volume-row">
+                <button id="mute-btn" type="button" aria-label="Mute">🔊</button>
+                <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
+                <span class="volume-label" id="volume-value">80%</span>
+            </div>
+
             <div class="controls">
                 <button class="control-btn" id="shuf-btn" aria-label="Shuffle">⤮</button>
                 <button class="control-btn" id="prev-btn" aria-label="Previous track">«</button>
@@ -361,6 +396,9 @@
         const seek = document.getElementById('seek');
         const elapsed = document.getElementById('elapsed');
         const durationLabel = document.getElementById('duration');
+        const volume = document.getElementById('volume');
+        const volumeValue = document.getElementById('volume-value');
+        const muteBtn = document.getElementById('mute-btn');
         const playBtn = document.getElementById('play-btn');
         const shufBtn = document.getElementById('shuf-btn');
         const repBtn = document.getElementById('rep-btn');
@@ -371,6 +409,7 @@
 
         const audio = new Audio();
         audio.preload = 'metadata';
+        audio.volume = 0.8;
 
         let playlist = [];
         let trackIdx = 0;
@@ -386,6 +425,7 @@
         let visualStarted = false;
         let seeking = false;
         let deferredInstallPrompt = null;
+        let lastNonZeroVolume = 0.8;
 
         function isStandalone() {
             return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -450,6 +490,35 @@
                 navigator.serviceWorker.register('./sw.js').catch(() => {});
             });
         }
+
+        function syncVolumeUI() {
+            const pct = Math.round(audio.volume * 100);
+            volume.value = pct;
+            volumeValue.innerText = pct + '%';
+            const muted = audio.muted || pct === 0;
+            muteBtn.innerText = muted ? '🔇' : pct < 50 ? '🔉' : '🔊';
+            muteBtn.classList.toggle('active', muted);
+            muteBtn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+        }
+
+        volume.addEventListener('input', () => {
+            const next = Math.max(0, Math.min(1, Number(volume.value) / 100));
+            audio.muted = false;
+            audio.volume = next;
+            if (next > 0) lastNonZeroVolume = next;
+            syncVolumeUI();
+        });
+
+        muteBtn.addEventListener('click', () => {
+            if (audio.muted || audio.volume === 0) {
+                audio.muted = false;
+                if (audio.volume === 0) audio.volume = lastNonZeroVolume || 0.8;
+            } else {
+                if (audio.volume > 0) lastNonZeroVolume = audio.volume;
+                audio.muted = true;
+            }
+            syncVolumeUI();
+        });
 
         function ensureAudioGraph() {
             if (!audioCtx) {
@@ -775,6 +844,7 @@
 
         audio.addEventListener('timeupdate', updateProgress);
         audio.addEventListener('loadedmetadata', updateProgress);
+        audio.addEventListener('volumechange', syncVolumeUI);
         audio.addEventListener('play', () => {
             isPlaying = true;
             syncPlayButton();
@@ -798,6 +868,7 @@
         window.addEventListener('beforeunload', revokePlaylistUrls);
 
         syncPlayButton();
+        syncVolumeUI();
         cycleRepeat();
         repeatMode = 0;
         repBtn.classList.remove('active');
