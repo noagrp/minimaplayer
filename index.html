@@ -288,13 +288,6 @@
             background: #000;
         }
 
-        #empty-install {
-            display: none;
-            border-color: #333;
-            color: var(--accent);
-        }
-
-        #empty-install.visible { display: block; }
         input[type="file"] { display: none; }
 
         @media (max-height: 620px) {
@@ -322,7 +315,6 @@
                 Open File
                 <input type="file" id="file-init" accept="audio/*,video/mp4" multiple>
             </label>
-            <button class="action-btn" id="empty-install" type="button">Install App</button>
         </div>
 
         <div id="drawer">
@@ -374,7 +366,6 @@
         const repBtn = document.getElementById('rep-btn');
         const drawer = document.getElementById('drawer');
         const installBtn = document.getElementById('install-btn');
-        const emptyInstall = document.getElementById('empty-install');
         const installSheet = document.getElementById('install-sheet');
         const installCopy = document.getElementById('install-copy');
 
@@ -406,7 +397,6 @@
 
         function setInstallVisible(visible) {
             installBtn.classList.toggle('visible', visible);
-            emptyInstall.classList.toggle('visible', visible);
         }
 
         function showInstallSheet(message) {
@@ -452,7 +442,6 @@
             installSheet.setAttribute('aria-hidden', 'true');
         });
         installBtn.addEventListener('click', installApp);
-        emptyInstall.addEventListener('click', installApp);
 
         if (!isStandalone() && isIOS()) setInstallVisible(true);
 
