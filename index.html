@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Minima">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
     <title>Minima Player</title>
     <style>
         :root {
@@ -25,6 +32,8 @@
             display: flex;
             justify-content: center;
             color: var(--white);
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         #stage {
@@ -37,6 +46,63 @@
             flex-direction: column;
             border-left: 1px solid var(--border);
             border-right: 1px solid var(--border);
+        }
+
+        #install-btn {
+            display: none;
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 3500;
+            border: 1px solid #333;
+            background: rgba(0,0,0,0.86);
+            color: var(--accent);
+            min-height: 42px;
+            padding: 0 14px;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #install-btn.visible { display: block; }
+
+        #install-sheet {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 5000;
+            background: rgba(0,0,0,0.93);
+            align-items: flex-end;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #install-sheet.open { display: flex; }
+
+        .install-card {
+            width: 100%;
+            border: 1px solid #2b2b2b;
+            background: #050505;
+            padding: 24px;
+        }
+
+        .install-title {
+            color: var(--white);
+            font-size: 12px;
+            letter-spacing: 4px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .install-copy {
+            color: #999;
+            font-size: 12px;
+            line-height: 1.7;
+            letter-spacing: 1px;
+            margin-bottom: 18px;
         }
 
         #visual-area {
@@ -214,12 +280,21 @@
             position: absolute;
             inset: 0;
             display: flex;
+            flex-direction: column;
+            gap: 14px;
             justify-content: center;
             align-items: center;
             z-index: 3000;
             background: #000;
         }
 
+        #empty-install {
+            display: none;
+            border-color: #333;
+            color: var(--accent);
+        }
+
+        #empty-install.visible { display: block; }
         input[type="file"] { display: none; }
 
         @media (max-height: 620px) {
@@ -232,11 +307,22 @@
 </head>
 <body>
     <div id="stage">
+        <button id="install-btn" type="button">Install App</button>
+
+        <div id="install-sheet" aria-hidden="true">
+            <div class="install-card">
+                <div class="install-title">Install Minima</div>
+                <div class="install-copy" id="install-copy">Install Minima Player on your home screen.</div>
+                <button class="action-btn" id="install-close" type="button" style="width:100%;">Got It</button>
+            </div>
+        </div>
+
         <div id="empty-state">
             <label class="action-btn" style="padding:25px 60px; border-color:var(--accent);">
                 Open File
                 <input type="file" id="file-init" accept="audio/*,video/mp4" multiple>
             </label>
+            <button class="action-btn" id="empty-install" type="button">Install App</button>
         </div>
 
         <div id="drawer">
@@ -287,6 +373,10 @@
         const shufBtn = document.getElementById('shuf-btn');
         const repBtn = document.getElementById('rep-btn');
         const drawer = document.getElementById('drawer');
+        const installBtn = document.getElementById('install-btn');
+        const emptyInstall = document.getElementById('empty-install');
+        const installSheet = document.getElementById('install-sheet');
+        const installCopy = document.getElementById('install-copy');
 
         const audio = new Audio();
         audio.preload = 'metadata';
@@ -304,6 +394,73 @@
         let freqData = null;
         let visualStarted = false;
         let seeking = false;
+        let deferredInstallPrompt = null;
+
+        function isStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        }
+
+        function isIOS() {
+            return /iphone|ipad|ipod/i.test(navigator.userAgent);
+        }
+
+        function setInstallVisible(visible) {
+            installBtn.classList.toggle('visible', visible);
+            emptyInstall.classList.toggle('visible', visible);
+        }
+
+        function showInstallSheet(message) {
+            installCopy.innerHTML = message;
+            installSheet.classList.add('open');
+            installSheet.setAttribute('aria-hidden', 'false');
+        }
+
+        async function installApp() {
+            if (isStandalone()) {
+                setInstallVisible(false);
+                return;
+            }
+
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                const choice = await deferredInstallPrompt.userChoice;
+                if (choice.outcome === 'accepted') setInstallVisible(false);
+                deferredInstallPrompt = null;
+                return;
+            }
+
+            if (isIOS()) {
+                showInstallSheet('On iPhone or iPad, tap the <strong>Share</strong> button in Safari, then choose <strong>Add to Home Screen</strong>. Open Minima from the new home-screen icon.');
+            } else {
+                showInstallSheet('Open this page in Chrome or another install-capable browser, then use its <strong>Install app</strong> or <strong>Add to Home screen</strong> option.');
+            }
+        }
+
+        window.addEventListener('beforeinstallprompt', event => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            if (!isStandalone()) setInstallVisible(true);
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            setInstallVisible(false);
+        });
+
+        document.getElementById('install-close').addEventListener('click', () => {
+            installSheet.classList.remove('open');
+            installSheet.setAttribute('aria-hidden', 'true');
+        });
+        installBtn.addEventListener('click', installApp);
+        emptyInstall.addEventListener('click', installApp);
+
+        if (!isStandalone() && isIOS()) setInstallVisible(true);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
 
         function ensureAudioGraph() {
             if (!audioCtx) {
