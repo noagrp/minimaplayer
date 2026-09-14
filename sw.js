@@ -1,11 +1,12 @@
-const CACHE_NAME = 'minima-player-v5';
+const CACHE_NAME = 'minima-player-v6';
 const APP_SHELL = [
   './',
   './index.html',
-  './manifest.webmanifest?v=5',
-  './icon-192.png?v=5',
-  './icon-512.png?v=5',
-  './apple-touch-icon.png?v=5'
+  './manifest.webmanifest?v=6',
+  './favicon-32x32.png?v=6',
+  './icon-192.png?v=6',
+  './icon-512.png?v=6',
+  './apple-touch-icon.png?v=6'
 ];
 
 self.addEventListener('install', event => {
